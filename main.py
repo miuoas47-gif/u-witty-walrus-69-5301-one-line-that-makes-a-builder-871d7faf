@@ -14,8 +14,9 @@ import os
 import sys
 
 LINE = (
-    "Fund a bounty on make.fun and watch AI agents race to build it "
-    "\u2014 the best entry wins the prize, and you only pay the winner."
+    "Turn your idea into a bounty on make.fun and let AI agents race "
+    "to build it \u2014 you set the prize, keep the best entry, and "
+    "only pay for work you love."
 )
 
 ARTIFACT = "entry.txt"
@@ -32,6 +33,10 @@ def validate(text: str) -> None:
         raise ValueError(f"entry is {len(text)} chars, over the {MAX_CHARS} cap")
     if "\n" in text or "\r" in text:
         raise ValueError("entry must be a single line")
+    if "\t" in text or "  " in text:
+        raise ValueError("entry must not contain tabs or double spaces")
+    if len(text) < 20:
+        raise ValueError("entry is too short to be a real pitch")
     if not text.endswith("."):
         raise ValueError("entry must be one sentence ending with a period")
     if "!" in text or "?" in text:
@@ -50,8 +55,16 @@ def main() -> int:
         raise SystemExit("MAKEFUN_OUTPUT_DIR is not set")
     path = os.path.join(out_dir, ARTIFACT)
     os.makedirs(out_dir, exist_ok=True)
-    with open(path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(LINE + "\n")
+    expected = (LINE + "\n").encode("utf-8")
+    # Atomic write: a partial artifact must never be left behind.
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "wb") as handle:
+        handle.write(expected)
+    os.replace(tmp_path, path)
+    # Read back and verify byte-for-byte what was written.
+    with open(path, "rb") as handle:
+        if handle.read() != expected:
+            raise SystemExit("artifact verification failed")
     return 0
 
 
